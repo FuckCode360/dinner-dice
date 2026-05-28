@@ -134,10 +134,7 @@ export default function App() {
   const summonTimer = useRef<number | null>(null);
 
   const theme = themes.find((item) => item.id === themeId) ?? themes[0];
-  const isRollView = view === "roll";
-  const themeStyle = {
-    "--theme-bg": isRollView ? `url(${theme.background})` : "linear-gradient(180deg, #171019, #09070d)",
-  } as CSSProperties;
+  const themeStyle = { "--theme-bg": `url(${theme.background})` } as CSSProperties;
   const candidates = useMemo(() => restaurants.filter((item) => matchesFilters(item, filters)), [filters, restaurants]);
   const picked = restaurants.find((item) => item.id === pickedId) ?? null;
   const recent = history.slice(0, 6);
@@ -262,14 +259,14 @@ export default function App() {
   }
 
   return (
-    <main className={`app-shell ${isRollView ? `theme-${theme.id}` : "theme-neutral"}`} style={themeStyle}>
+    <main className={`app-shell theme-${theme.id}`} style={themeStyle}>
       <section className="draw-stage">
         <header className="hero-bar">
           <div className="title-lockup">
             <h1>今天吃什么</h1>
             <p>
               <Sparkles size={15} />
-              {isRollView ? theme.subtitle : subtitleForView(view)}
+              {view === "roll" ? theme.subtitle : subtitleForView(view)}
               <Sparkles size={15} />
             </p>
           </div>
