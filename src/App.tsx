@@ -2,6 +2,7 @@ import { ChangeEvent, CSSProperties, FormEvent, ReactNode, useEffect, useMemo, u
 import {
   Archive,
   BookOpen,
+  Building2,
   ChefHat,
   Clock3,
   Dice5,
@@ -30,7 +31,7 @@ import {
   saveHistory,
   saveRestaurants,
 } from "./storage";
-import type { DinnerHistory, Filters, MealMode, Restaurant, SpicePreference } from "./types";
+import type { DinnerHistory, Filters, MealMode, MealPlace, PlaceFilter, Restaurant, SpicePreference } from "./types";
 import tavernBg from "./assets/theme-tavern.png";
 import candyBg from "./assets/theme-candy.png";
 import cosmicBg from "./assets/theme-cosmic.png";
@@ -91,6 +92,7 @@ const emptyDraft: Draft = {
   name: "",
   category: "",
   mode: "dine-in",
+  place: "both",
   budget: 35,
   distanceMinutes: 15,
   health: 3,
@@ -101,11 +103,11 @@ const emptyDraft: Draft = {
 };
 
 const demoRestaurants: Restaurant[] = [
-  makeRestaurant({ name: "楼下盖饭", category: "快饭", budget: 28, distanceMinutes: 8, health: 2, spice: 1, weight: 4 }),
-  makeRestaurant({ name: "清爽轻食碗", category: "轻食", mode: "delivery", budget: 42, distanceMinutes: 25, health: 5, spice: 0, weight: 3 }),
-  makeRestaurant({ name: "川味小炒", category: "川菜", budget: 55, distanceMinutes: 18, health: 2, spice: 3, weight: 5 }),
-  makeRestaurant({ name: "牛肉粉", category: "粉面", budget: 32, distanceMinutes: 12, health: 3, spice: 2, weight: 4 }),
-  makeRestaurant({ name: "日式便当", category: "便当", mode: "delivery", budget: 48, distanceMinutes: 30, health: 4, spice: 0, weight: 3 }),
+  makeRestaurant({ name: "公司楼下盖饭", category: "快饭", place: "work", budget: 28, distanceMinutes: 8, health: 2, spice: 1, weight: 4 }),
+  makeRestaurant({ name: "家附近轻食碗", category: "轻食", mode: "delivery", place: "home", budget: 42, distanceMinutes: 25, health: 5, spice: 0, weight: 3 }),
+  makeRestaurant({ name: "川味小炒", category: "川菜", place: "both", budget: 55, distanceMinutes: 18, health: 2, spice: 3, weight: 5 }),
+  makeRestaurant({ name: "公司牛肉粉", category: "粉面", place: "work", budget: 32, distanceMinutes: 12, health: 3, spice: 2, weight: 4 }),
+  makeRestaurant({ name: "家附近日式便当", category: "便当", mode: "delivery", place: "home", budget: 48, distanceMinutes: 30, health: 4, spice: 0, weight: 3 }),
 ];
 
 const defaultFilters: Filters = {
@@ -114,6 +116,7 @@ const defaultFilters: Filters = {
   minHealth: 1,
   spicePreference: "any",
   mode: "either",
+  place: "work",
 };
 
 export default function App() {
@@ -204,6 +207,7 @@ export default function App() {
       name: item.name,
       category: item.category,
       mode: item.mode,
+      place: item.place || "both",
       budget: item.budget,
       distanceMinutes: item.distanceMinutes,
       health: item.health,
@@ -228,7 +232,7 @@ export default function App() {
   }
 
   function relaxFilters() {
-    setFilters({ maxBudget: 120, maxDistance: 60, minHealth: 1, spicePreference: "any", mode: "either" });
+    setFilters({ maxBudget: 120, maxDistance: 60, minHealth: 1, spicePreference: "any", mode: "either", place: filters.place });
     setNotice("已放宽抽卡条件");
   }
 
@@ -277,11 +281,21 @@ export default function App() {
           <>
             <section className="filter-console">
               <div className="filter-grid">
+                <FilterChip icon={<Building2 size={18} />} label="地点" value={placeFilterLabel(filters.place)} />
                 <FilterChip icon={<WalletCards size={18} />} label="预算" value={`¥${filters.maxBudget}内`} />
                 <FilterChip icon={<MapPin size={18} />} label="距离" value={`${filters.maxDistance}分钟内`} />
                 <FilterChip icon={<Leaf size={18} />} label="健康度" value={filters.minHealth <= 1 ? "不限" : `${filters.minHealth}/5起`} />
                 <FilterChip icon={<Flame size={18} />} label="辣度" value={spicePreferenceLabel(filters.spicePreference)} />
               </div>
+              <Segmented
+                label="用餐地点"
+                value={filters.place}
+                options={[
+                  ["work", "公司"],
+                  ["home", "家里"],
+                ]}
+                onChange={(value) => setFilters({ ...filters, place: value as PlaceFilter })}
+              />
               <Segmented
                 label={theme.sourceLabel}
                 value={filters.mode}
@@ -384,6 +398,16 @@ export default function App() {
                 ]}
                 onChange={(value) => setDraft({ ...draft, mode: value as Restaurant["mode"] })}
               />
+              <Segmented
+                label="地点"
+                value={draft.place}
+                options={[
+                  ["both", "都可"],
+                  ["work", "公司"],
+                  ["home", "家里"],
+                ]}
+                onChange={(value) => setDraft({ ...draft, place: value as MealPlace })}
+              />
               <label className="field">
                 <span>备注</span>
                 <textarea value={draft.note} onChange={(event) => setDraft({ ...draft, note: event.target.value })} placeholder="比如：下雨天别去，排队久" />
@@ -406,11 +430,12 @@ export default function App() {
                   <article className={item.enabled ? "food-card" : "food-card disabled"} key={item.id}>
                     <div className="food-thumb">{dishEmoji(item)}</div>
                     <div>
-                      <p>{rarityFor(item)} · {item.category || modeLabel(item.mode)}</p>
+                      <p>{rarityFor(item)} · {placeLabel(item.place)} · {item.category || modeLabel(item.mode)}</p>
                       <h3>{item.name}</h3>
                       <div className="meta-line">
                         <span>¥{item.budget}</span>
                         <span>{item.distanceMinutes} 分钟</span>
+                        <span>{modeLabel(item.mode)}</span>
                         <span>{spiceLabel(item.spice)}</span>
                         <span>权重 {item.weight}</span>
                       </div>
@@ -459,6 +484,15 @@ export default function App() {
               <Slider label="最高预算" value={filters.maxBudget} min={15} max={150} step={5} unit="元" onChange={(value) => setFilters({ ...filters, maxBudget: value })} />
               <Slider label="最远距离" value={filters.maxDistance} min={5} max={60} step={5} unit="分钟" onChange={(value) => setFilters({ ...filters, maxDistance: value })} />
               <Slider label="最低健康" value={filters.minHealth} min={1} max={5} step={1} unit="/5" onChange={(value) => setFilters({ ...filters, minHealth: value })} />
+              <Segmented
+                label="默认地点"
+                value={filters.place}
+                options={[
+                  ["work", "公司"],
+                  ["home", "家里"],
+                ]}
+                onChange={(value) => setFilters({ ...filters, place: value as PlaceFilter })}
+              />
               <Segmented
                 label="辣度"
                 value={filters.spicePreference}
@@ -560,7 +594,7 @@ function FoodPrizeCard({ restaurant, theme, restaurantsCount }: { restaurant: Re
       </div>
       <div className="card-copy">
         <h2>{name}</h2>
-        <p>{restaurant?.note || restaurant?.category || (restaurantsCount ? "设好条件，抽一张今日饭运" : "先去卡册放几家常吃的店")}</p>
+        <p>{restaurant ? `${placeLabel(restaurant.place)} · ${restaurant.note || restaurant.category || modeLabel(restaurant.mode)}` : restaurantsCount ? "设好条件，抽一张今日饭运" : "先去卡册放几家常吃的店"}</p>
       </div>
       <div className="stat-grid">
         <Stat icon={<WalletCards size={16} />} label="价格" value={restaurant ? `¥${restaurant.budget}` : "--"} />
@@ -650,6 +684,16 @@ function makeRestaurant(input: Partial<Draft> & Pick<Draft, "name">): Restaurant
 
 function modeLabel(mode: Restaurant["mode"]) {
   return mode === "delivery" ? "外卖" : "堂食";
+}
+
+function placeFilterLabel(place: PlaceFilter) {
+  return place === "work" ? "公司" : "家里";
+}
+
+function placeLabel(place: MealPlace) {
+  if (place === "work") return "公司";
+  if (place === "home") return "家里";
+  return "都可";
 }
 
 function subtitleForView(view: View) {

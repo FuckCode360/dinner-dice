@@ -1,4 +1,6 @@
 export type MealMode = "either" | "dine-in" | "delivery";
+export type MealPlace = "work" | "home" | "both";
+export type PlaceFilter = Exclude<MealPlace, "both">;
 export type SpicePreference = "any" | "spicy" | "mild";
 
 export interface Restaurant {
@@ -6,6 +8,7 @@ export interface Restaurant {
   name: string;
   category: string;
   mode: Exclude<MealMode, "either">;
+  place: MealPlace;
   budget: number;
   distanceMinutes: number;
   health: number;
@@ -31,6 +34,7 @@ export interface Filters {
   minHealth: number;
   spicePreference: SpicePreference;
   mode: MealMode;
+  place: PlaceFilter;
 }
 
 export interface BackupPayload {

@@ -17,6 +17,7 @@
 - 已新增 GitHub Pages Actions 部署配置，并已推送到 `FuckCode360/dinner-dice` 自动构建发布。
 - 已按使用反馈调整入口：抽卡皮肤只在设置页切换且只作用于抽卡页，备份导入导出移入设置页，示例数据移入设置页调试模式，底部入口改为“抽卡”。
 - 已补充 PWA 安装资源：manifest、favicon、apple-touch-icon、Android any/maskable PNG 图标和最小 service worker。
+- 已新增“公司 / 家里”用餐地点维度：抽卡页可切换当前地点，卡册可给每张卡标记公司、家里或都可，旧数据默认兼容为都可。
 
 ## 进行中
 

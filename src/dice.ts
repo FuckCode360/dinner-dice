@@ -35,6 +35,7 @@ export function matchesFilters(item: Restaurant, filters: Filters) {
   if (item.distanceMinutes > filters.maxDistance) return false;
   if (item.health < filters.minHealth) return false;
   if (filters.mode !== "either" && item.mode !== filters.mode) return false;
+  if (item.place !== "both" && item.place !== filters.place) return false;
   if (filters.spicePreference === "spicy" && item.spice < 2) return false;
   if (filters.spicePreference === "mild" && item.spice > 1) return false;
   return true;

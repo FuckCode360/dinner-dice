@@ -4,7 +4,7 @@ const RESTAURANTS_KEY = "dinner-dice:v1:restaurants";
 const HISTORY_KEY = "dinner-dice:v1:history";
 
 export function loadRestaurants(): Restaurant[] {
-  return readJson<Restaurant[]>(RESTAURANTS_KEY, []);
+  return readJson<Partial<Restaurant>[]>(RESTAURANTS_KEY, []).map(normalizeRestaurant);
 }
 
 export function saveRestaurants(restaurants: Restaurant[]) {
@@ -33,7 +33,11 @@ export function parseBackup(text: string): BackupPayload {
   if (payload.version !== 1 || !Array.isArray(payload.restaurants) || !Array.isArray(payload.history)) {
     throw new Error("备份文件格式不正确");
   }
-  return payload as BackupPayload;
+  return {
+    ...payload,
+    restaurants: payload.restaurants.map(normalizeRestaurant),
+    history: payload.history,
+  } as BackupPayload;
 }
 
 function readJson<T>(key: string, fallback: T): T {
@@ -43,4 +47,24 @@ function readJson<T>(key: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+function normalizeRestaurant(item: Partial<Restaurant>): Restaurant {
+  return {
+    id: item.id || crypto.randomUUID(),
+    name: item.name || "",
+    category: item.category || "",
+    mode: item.mode === "delivery" ? "delivery" : "dine-in",
+    place: item.place === "work" || item.place === "home" || item.place === "both" ? item.place : "both",
+    budget: Number(item.budget) || 35,
+    distanceMinutes: Number(item.distanceMinutes) || 15,
+    health: Number(item.health) || 3,
+    spice: Number(item.spice) || 0,
+    weight: Number(item.weight) || 3,
+    note: item.note || "",
+    enabled: item.enabled ?? true,
+    createdAt: item.createdAt || new Date().toISOString(),
+    updatedAt: item.updatedAt || new Date().toISOString(),
+    lastEatenAt: item.lastEatenAt,
+  };
 }
