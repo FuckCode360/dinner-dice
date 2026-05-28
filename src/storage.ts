@@ -1,8 +1,10 @@
-import type { BackupPayload, DinnerHistory, Restaurant } from "./types";
+import type { BackupPayload, DailyDrawState, DinnerHistory, Restaurant } from "./types";
 import { inferArtworkId } from "./cardArt";
 
 const RESTAURANTS_KEY = "dinner-dice:v1:restaurants";
 const HISTORY_KEY = "dinner-dice:v1:history";
+const DAILY_DRAW_KEY = "dinner-dice:v1:daily-draw";
+export const DAILY_DRAW_LIMIT = 3;
 
 export function loadRestaurants(): Restaurant[] {
   return readJson<Partial<Restaurant>[]>(RESTAURANTS_KEY, []).map(normalizeRestaurant);
@@ -18,6 +20,37 @@ export function loadHistory(): DinnerHistory[] {
 
 export function saveHistory(history: DinnerHistory[]) {
   localStorage.setItem(HISTORY_KEY, JSON.stringify(history.slice(0, 50)));
+}
+
+export function todayKey(date = new Date()) {
+  const local = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 10);
+}
+
+export function createEmptyDailyDrawState(date = todayKey()): DailyDrawState {
+  return {
+    date,
+    used: 0,
+  };
+}
+
+export function normalizeDailyDrawState(state: Partial<DailyDrawState> | null | undefined): DailyDrawState {
+  const date = todayKey();
+  if (!state || state.date !== date) return createEmptyDailyDrawState(date);
+  return {
+    date,
+    used: Math.max(0, Math.min(DAILY_DRAW_LIMIT, Number(state.used) || 0)),
+    committedRestaurantId: state.committedRestaurantId,
+    committedAt: state.committedAt,
+  };
+}
+
+export function loadDailyDrawState(): DailyDrawState {
+  return normalizeDailyDrawState(readJson<Partial<DailyDrawState> | null>(DAILY_DRAW_KEY, null));
+}
+
+export function saveDailyDrawState(state: DailyDrawState) {
+  localStorage.setItem(DAILY_DRAW_KEY, JSON.stringify(normalizeDailyDrawState(state)));
 }
 
 export function createBackup(restaurants: Restaurant[], history: DinnerHistory[]): BackupPayload {

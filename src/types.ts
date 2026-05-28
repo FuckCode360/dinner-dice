@@ -29,6 +29,13 @@ export interface DinnerHistory {
   eatenAt: string;
 }
 
+export interface DailyDrawState {
+  date: string;
+  used: number;
+  committedRestaurantId?: string;
+  committedAt?: string;
+}
+
 export interface Filters {
   maxBudget: number;
   maxDistance: number;

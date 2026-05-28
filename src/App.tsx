@@ -27,9 +27,14 @@ import { artworkSrc, cardArtworks, defaultArtworkId, getArtwork, inferArtworkId 
 import { matchesFilters, rollDinner } from "./dice";
 import {
   createBackup,
+  createEmptyDailyDrawState,
+  DAILY_DRAW_LIMIT,
+  loadDailyDrawState,
   loadHistory,
   loadRestaurants,
+  normalizeDailyDrawState,
   parseBackup,
+  saveDailyDrawState,
   saveHistory,
   saveRestaurants,
 } from "./storage";
@@ -49,7 +54,6 @@ interface ThemeConfig {
   subtitle: string;
   sourceLabel: string;
   action: string;
-  cost: string;
   cardWord: string;
   background: string;
 }
@@ -61,8 +65,7 @@ const themes: ThemeConfig[] = [
     nav: "占卜",
     subtitle: "今日食运占卜",
     sourceLabel: "食源池",
-    action: "揭晓今日任务",
-    cost: "今日剩余 1 次",
+    action: "抽卡",
     cardWord: "任务",
     background: tavernBg,
   },
@@ -72,8 +75,7 @@ const themes: ThemeConfig[] = [
     nav: "扭蛋",
     subtitle: "今天的午晚餐命运",
     sourceLabel: "收藏夹",
-    action: "抽取推荐",
-    cost: "每日 0/3",
+    action: "抽卡",
     cardWord: "推荐",
     background: candyBg,
   },
@@ -83,8 +85,7 @@ const themes: ThemeConfig[] = [
     nav: "召唤",
     subtitle: "抽一张今日饭运",
     sourceLabel: "来源池",
-    action: "召唤今日晚餐",
-    cost: "我的饭运卡：3 张",
+    action: "抽卡",
     cardWord: "饭运卡",
     background: cosmicBg,
   },
@@ -130,6 +131,7 @@ export default function App() {
   const [filters, setFilters] = useState<Filters>(defaultFilters);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [editingId, setEditingId] = useState<string | null>(null);
+  const [dailyDraw, setDailyDraw] = useState(() => loadDailyDrawState());
   const [pickedId, setPickedId] = useState<string | null>(null);
   const [isSummoning, setIsSummoning] = useState(false);
   const [notice, setNotice] = useState("");
@@ -139,12 +141,38 @@ export default function App() {
   const theme = themes.find((item) => item.id === themeId) ?? themes[0];
   const themeStyle = { "--theme-bg": `url(${theme.background})` } as CSSProperties;
   const candidates = useMemo(() => restaurants.filter((item) => matchesFilters(item, filters)), [filters, restaurants]);
-  const picked = restaurants.find((item) => item.id === pickedId) ?? null;
+  const picked =
+    restaurants.find((item) => item.id === pickedId) ??
+    restaurants.find((item) => item.id === dailyDraw.committedRestaurantId) ??
+    null;
   const recent = history.slice(0, 6);
+  const remainingDraws = Math.max(0, DAILY_DRAW_LIMIT - dailyDraw.used);
+  const isDailyCommitted = Boolean(dailyDraw.committedRestaurantId);
+  const canRoll = !isSummoning && !isDailyCommitted && remainingDraws > 0;
+  const rollButtonLabel = isSummoning
+    ? "召唤中"
+    : isDailyCommitted
+      ? "今日已定"
+      : remainingDraws <= 0
+        ? "次数用完"
+        : picked
+          ? "再抽一次"
+          : theme.action;
 
   useEffect(() => saveRestaurants(restaurants), [restaurants]);
   useEffect(() => saveHistory(history), [history]);
+  useEffect(() => saveDailyDrawState(dailyDraw), [dailyDraw]);
   useEffect(() => localStorage.setItem("dinner-dice:v1:theme", themeId), [themeId]);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setDailyDraw((current) => {
+        const next = normalizeDailyDrawState(current);
+        if (next.date !== current.date) setPickedId(null);
+        return next;
+      });
+    }, 60_000);
+    return () => window.clearInterval(timer);
+  }, []);
   useEffect(() => {
     return () => {
       if (summonTimer.current) window.clearTimeout(summonTimer.current);
@@ -153,19 +181,44 @@ export default function App() {
 
   function handleRoll() {
     if (isSummoning) return;
+    const currentDailyDraw = normalizeDailyDrawState(dailyDraw);
+    if (currentDailyDraw.committedRestaurantId) {
+      setDailyDraw(currentDailyDraw);
+      setNotice("今日已经落子，明天再抽");
+      return;
+    }
+    if (currentDailyDraw.used >= DAILY_DRAW_LIMIT) {
+      setDailyDraw(currentDailyDraw);
+      setNotice("今日抽卡次数已用完");
+      return;
+    }
     if (summonTimer.current) window.clearTimeout(summonTimer.current);
     const result = rollDinner(restaurants, filters);
+    if (!result.restaurant) {
+      setPickedId(null);
+      setNotice("没有符合条件的选项，未消耗今日次数");
+      return;
+    }
+    const restaurant = result.restaurant;
+    const nextDailyDraw = { ...currentDailyDraw, used: currentDailyDraw.used + 1 };
+    setDailyDraw(nextDailyDraw);
     setIsSummoning(true);
-    setNotice(result.restaurant ? "饭运召唤中..." : "正在翻找卡池...");
+    setNotice("饭运召唤中...");
     summonTimer.current = window.setTimeout(() => {
-      setPickedId(result.restaurant?.id ?? null);
-      setNotice(result.restaurant ? `${result.candidates.length} 个候选里抽到了它` : "没有符合条件的选项");
+      setPickedId(restaurant.id);
+      setNotice(`${result.candidates.length} 个候选里抽到了它，今日已用 ${nextDailyDraw.used}/${DAILY_DRAW_LIMIT}`);
       setIsSummoning(false);
       summonTimer.current = null;
     }, 860);
   }
 
   function markEaten(restaurant: Restaurant) {
+    const currentDailyDraw = normalizeDailyDrawState(dailyDraw);
+    if (currentDailyDraw.committedRestaurantId) {
+      setDailyDraw(currentDailyDraw);
+      setNotice("今日已落子，不能重复记入");
+      return;
+    }
     const eatenAt = new Date().toISOString();
     setRestaurants((items) =>
       items.map((item) => (item.id === restaurant.id ? { ...item, lastEatenAt: eatenAt, updatedAt: eatenAt } : item)),
@@ -179,7 +232,13 @@ export default function App() {
       },
       ...items,
     ]);
-    setNotice("已记入最近抽到");
+    setDailyDraw({
+      ...currentDailyDraw,
+      committedRestaurantId: restaurant.id,
+      committedAt: eatenAt,
+    });
+    setPickedId(restaurant.id);
+    setNotice("今日已落子，明天再抽");
   }
 
   function submitRestaurant(event: FormEvent) {
@@ -259,6 +318,7 @@ export default function App() {
       const payload = parseBackup(await file.text());
       setRestaurants(payload.restaurants);
       setHistory(payload.history);
+      setDailyDraw(createEmptyDailyDrawState());
       setPickedId(null);
       setNotice("备份已导入");
     } catch (error) {
@@ -313,6 +373,10 @@ export default function App() {
                 ]}
                 onChange={(value) => setFilters({ ...filters, mode: value as MealMode })}
               />
+              <div className="draw-rule-card">
+                <span>今日抽卡 {dailyDraw.used}/{DAILY_DRAW_LIMIT}</span>
+                <em>{dailyDrawStatusLabel(isDailyCommitted, dailyDraw.used, remainingDraws)}</em>
+              </div>
             </section>
 
             <section className={isSummoning ? "summon-panel is-summoning" : "summon-panel"}>
@@ -333,20 +397,20 @@ export default function App() {
 
               <FoodPrizeCard restaurant={picked} theme={theme} restaurantsCount={restaurants.length} />
 
-              <button className="summon-button" type="button" onClick={handleRoll} disabled={isSummoning}>
+              <button className="summon-button" type="button" onClick={handleRoll} disabled={!canRoll}>
                 <RefreshCcw size={24} />
-                <span>{isSummoning ? "召唤中" : theme.action}</span>
-                <small>{isSummoning ? "饭运正在展开" : theme.cost}</small>
+                <span>{rollButtonLabel}</span>
+                <small>{isSummoning ? "饭运正在展开" : dailyDrawCostText(isDailyCommitted, remainingDraws)}</small>
               </button>
 
               <div className="summon-actions">
-                <button type="button" onClick={handleRoll} disabled={isSummoning}>
+                <button type="button" onClick={handleRoll} disabled={!picked || !canRoll}>
                   <RefreshCcw size={18} />
-                  {isSummoning ? "抽取中" : "再抽一次"}
+                  {isSummoning ? "抽取中" : remainingDraws <= 0 ? "次数用完" : "反悔再抽"}
                 </button>
-                <button type="button" onClick={picked ? () => markEaten(picked) : () => setView("library")}>
+                <button type="button" onClick={picked ? () => markEaten(picked) : () => setView("library")} disabled={picked ? isSummoning || isDailyCommitted : false}>
                   <Star size={18} />
-                  {picked ? "记入历史" : "去卡册"}
+                  {picked ? isDailyCommitted ? "今日已定" : "确认落子" : "去卡册"}
                 </button>
               </div>
             </section>
@@ -757,6 +821,19 @@ function subtitleForView(view: View) {
   if (view === "library") return "我的卡册";
   if (view === "history") return "最近抽到";
   return "设置与备份";
+}
+
+function dailyDrawStatusLabel(isCommitted: boolean, used: number, remaining: number) {
+  if (isCommitted) return "已落子";
+  if (remaining <= 0) return "次数用尽";
+  if (used === 0) return "未抽卡";
+  return "可反悔";
+}
+
+function dailyDrawCostText(isCommitted: boolean, remaining: number) {
+  if (isCommitted) return "今日已落子";
+  if (remaining <= 0) return "今日次数用完";
+  return `今日剩余 ${remaining} 次`;
 }
 
 function spicePreferenceLabel(value: SpicePreference) {
