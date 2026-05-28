@@ -51,6 +51,8 @@ npm run preview
 3. 上传 `dist/`
 4. 发布到 GitHub Pages
 
+工作流中的 `actions/configure-pages` 会尝试自动启用 GitHub Pages 并配置为 GitHub Actions 发布源。
+
 `vite.config.ts` 会在 GitHub Actions 中读取 `GITHUB_REPOSITORY`，自动把项目站点的 `base` 设置为 `/<仓库名>/`。例如仓库为 `FuckCode360/dinner-dice` 时，站点地址通常是：
 
 ```text
