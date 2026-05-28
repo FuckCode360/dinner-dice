@@ -7,23 +7,18 @@ import {
   Dice5,
   Download,
   Flame,
-  Heart,
   History,
-  Home,
   Leaf,
   ListPlus,
   MapPin,
   Pencil,
   RefreshCcw,
   Save,
-  ScrollText,
   Settings,
   Sparkles,
   Star,
-  Store,
   Trash2,
   Upload,
-  Utensils,
   WalletCards,
 } from "lucide-react";
 import { matchesFilters, rollDinner } from "./dice";
@@ -136,7 +131,10 @@ export default function App() {
   const summonTimer = useRef<number | null>(null);
 
   const theme = themes.find((item) => item.id === themeId) ?? themes[0];
-  const themeStyle = { "--theme-bg": `url(${theme.background})` } as CSSProperties;
+  const isRollView = view === "roll";
+  const themeStyle = {
+    "--theme-bg": isRollView ? `url(${theme.background})` : "linear-gradient(180deg, #171019, #09070d)",
+  } as CSSProperties;
   const candidates = useMemo(() => restaurants.filter((item) => matchesFilters(item, filters)), [filters, restaurants]);
   const picked = restaurants.find((item) => item.id === pickedId) ?? null;
   const recent = history.slice(0, 6);
@@ -260,33 +258,18 @@ export default function App() {
   }
 
   return (
-    <main className={`app-shell theme-${theme.id}`} style={themeStyle}>
+    <main className={`app-shell ${isRollView ? `theme-${theme.id}` : "theme-neutral"}`} style={themeStyle}>
       <section className="draw-stage">
         <header className="hero-bar">
-          <button className="round-button" type="button" title="导入备份" onClick={() => fileInput.current?.click()}>
-            <ScrollText size={19} />
-          </button>
           <div className="title-lockup">
             <h1>今天吃什么</h1>
             <p>
               <Sparkles size={15} />
-              {theme.subtitle}
+              {isRollView ? theme.subtitle : subtitleForView(view)}
               <Sparkles size={15} />
             </p>
           </div>
-          <button className="round-button" type="button" title="导出备份" onClick={exportBackup}>
-            <Download size={19} />
-          </button>
-          <input ref={fileInput} className="hidden" type="file" accept="application/json" onChange={importBackup} />
         </header>
-
-        <div className="theme-switcher" aria-label="抽卡页面样式">
-          {themes.map((item) => (
-            <button className={item.id === theme.id ? "active" : ""} key={item.id} type="button" onClick={() => setThemeId(item.id)}>
-              {item.nav}
-            </button>
-          ))}
-        </div>
 
         {notice && <div className="notice">{notice}</div>}
 
@@ -340,9 +323,9 @@ export default function App() {
                   <RefreshCcw size={18} />
                   {isSummoning ? "抽取中" : "再抽一次"}
                 </button>
-                <button type="button" onClick={picked ? () => markEaten(picked) : fillDemo}>
+                <button type="button" onClick={picked ? () => markEaten(picked) : () => setView("library")}>
                   <Star size={18} />
-                  {picked ? "记入历史" : "填入示例"}
+                  {picked ? "记入历史" : "去卡册"}
                 </button>
               </div>
             </section>
@@ -416,17 +399,6 @@ export default function App() {
             </form>
 
             <section className="glass-panel">
-              <div className="toolbar">
-                <button type="button" onClick={fillDemo}>填入示例</button>
-                <button type="button" onClick={() => fileInput.current?.click()}>
-                  <Upload size={16} />
-                  导入
-                </button>
-                <button type="button" onClick={exportBackup}>
-                  <Download size={16} />
-                  导出
-                </button>
-              </div>
               {restaurants.length === 0 ? (
                 <EmptyState title="卡册为空" text="先加 10 到 20 个常吃选项，这个工具就开始有用了。" />
               ) : (
@@ -478,27 +450,72 @@ export default function App() {
         )}
 
         {view === "settings" && (
-          <section className="glass-panel">
-            <div className="section-title">
-              <Settings size={18} />
-              <h2>抽卡设置</h2>
+          <section className="settings-stack">
+            <div className="glass-panel">
+              <div className="section-title">
+                <Settings size={18} />
+                <h2>抽卡设置</h2>
+              </div>
+              <Slider label="最高预算" value={filters.maxBudget} min={15} max={150} step={5} unit="元" onChange={(value) => setFilters({ ...filters, maxBudget: value })} />
+              <Slider label="最远距离" value={filters.maxDistance} min={5} max={60} step={5} unit="分钟" onChange={(value) => setFilters({ ...filters, maxDistance: value })} />
+              <Slider label="最低健康" value={filters.minHealth} min={1} max={5} step={1} unit="/5" onChange={(value) => setFilters({ ...filters, minHealth: value })} />
+              <Segmented
+                label="辣度"
+                value={filters.spicePreference}
+                options={[
+                  ["any", "不限"],
+                  ["spicy", "想吃辣"],
+                  ["mild", "不吃辣"],
+                ]}
+                onChange={(value) => setFilters({ ...filters, spicePreference: value as SpicePreference })}
+              />
+              <div className="candidate-row">
+                <span>当前候选 {candidates.length}</span>
+                <button type="button" onClick={relaxFilters}>放宽条件</button>
+              </div>
             </div>
-            <Slider label="最高预算" value={filters.maxBudget} min={15} max={150} step={5} unit="元" onChange={(value) => setFilters({ ...filters, maxBudget: value })} />
-            <Slider label="最远距离" value={filters.maxDistance} min={5} max={60} step={5} unit="分钟" onChange={(value) => setFilters({ ...filters, maxDistance: value })} />
-            <Slider label="最低健康" value={filters.minHealth} min={1} max={5} step={1} unit="/5" onChange={(value) => setFilters({ ...filters, minHealth: value })} />
-            <Segmented
-              label="辣度"
-              value={filters.spicePreference}
-              options={[
-                ["any", "不限"],
-                ["spicy", "想吃辣"],
-                ["mild", "不吃辣"],
-              ]}
-              onChange={(value) => setFilters({ ...filters, spicePreference: value as SpicePreference })}
-            />
-            <div className="candidate-row">
-              <span>当前候选 {candidates.length}</span>
-              <button type="button" onClick={relaxFilters}>放宽条件</button>
+
+            <div className="glass-panel">
+              <div className="section-title">
+                <Sparkles size={18} />
+                <h2>抽卡皮肤</h2>
+              </div>
+              <div className="theme-switcher" aria-label="抽卡页面样式">
+                {themes.map((item) => (
+                  <button className={item.id === theme.id ? "active" : ""} key={item.id} type="button" onClick={() => setThemeId(item.id)}>
+                    {item.nav}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="glass-panel">
+              <div className="section-title">
+                <Archive size={18} />
+                <h2>数据备份</h2>
+              </div>
+              <div className="toolbar">
+                <button type="button" onClick={exportBackup}>
+                  <Download size={16} />
+                  导出备份
+                </button>
+                <button type="button" onClick={() => fileInput.current?.click()}>
+                  <Upload size={16} />
+                  导入备份
+                </button>
+              </div>
+              <p className="settings-hint">导出的 JSON 是本机数据备份，饭店卡册和历史仍保存在当前浏览器里。</p>
+              <input ref={fileInput} className="hidden" type="file" accept="application/json" onChange={importBackup} />
+            </div>
+
+            <div className="glass-panel">
+              <div className="section-title">
+                <ChefHat size={18} />
+                <h2>调试模式</h2>
+              </div>
+              <div className="toolbar">
+                <button type="button" onClick={fillDemo}>填入示例</button>
+              </div>
             </div>
           </section>
         )}
@@ -507,7 +524,7 @@ export default function App() {
       <nav className="bottom-nav">
         <button className={view === "roll" ? "active" : ""} type="button" onClick={() => setView("roll")}>
           <Dice5 size={19} />
-          抽推荐
+          抽卡
         </button>
         <button className={view === "library" ? "active" : ""} type="button" onClick={() => setView("library")}>
           <BookOpen size={19} />
@@ -633,6 +650,12 @@ function makeRestaurant(input: Partial<Draft> & Pick<Draft, "name">): Restaurant
 
 function modeLabel(mode: Restaurant["mode"]) {
   return mode === "delivery" ? "外卖" : "堂食";
+}
+
+function subtitleForView(view: View) {
+  if (view === "library") return "我的卡册";
+  if (view === "history") return "最近抽到";
+  return "设置与备份";
 }
 
 function spicePreferenceLabel(value: SpicePreference) {
