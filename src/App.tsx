@@ -4,6 +4,7 @@ import {
   BookOpen,
   Building2,
   ChefHat,
+  ChevronDown,
   Clock3,
   Dice5,
   Download,
@@ -665,17 +666,40 @@ function NumberField({ label, value, min, onChange }: { label: string; value: nu
 }
 
 function ArtworkPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const selected = getArtwork(value);
   return (
     <div className="artwork-picker">
       <span>卡牌图案</span>
-      <div className="artwork-grid">
-        {cardArtworks.map((item) => (
-          <button className={value === item.id ? "selected" : ""} key={item.id} type="button" onClick={() => onChange(item.id)} title={item.label}>
-            <img src={artworkSrc(item.id)} alt={item.label} />
-            <strong>{item.label}</strong>
-          </button>
-        ))}
-      </div>
+      <button className="artwork-trigger" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+        <img src={artworkSrc(selected.id)} alt={selected.label} />
+        <span>
+          <strong>{selected.label}</strong>
+          <small>{open ? "收起卡面素材" : `${cardArtworks.length} 张卡面素材`}</small>
+        </span>
+        <ChevronDown className="drawer-chevron" size={18} />
+      </button>
+      {open && (
+        <div className="artwork-drawer">
+          <div className="artwork-grid">
+            {cardArtworks.map((item) => (
+              <button
+                className={value === item.id ? "selected" : ""}
+                key={item.id}
+                type="button"
+                onClick={() => {
+                  onChange(item.id);
+                  setOpen(false);
+                }}
+                title={item.label}
+              >
+                <img src={artworkSrc(item.id)} alt={item.label} />
+                <strong>{item.label}</strong>
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
