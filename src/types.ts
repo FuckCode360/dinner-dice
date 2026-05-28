@@ -7,6 +7,7 @@ export interface Restaurant {
   id: string;
   name: string;
   category: string;
+  artworkId: string;
   mode: Exclude<MealMode, "either">;
   place: MealPlace;
   budget: number;

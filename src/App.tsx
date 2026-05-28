@@ -22,6 +22,7 @@ import {
   Upload,
   WalletCards,
 } from "lucide-react";
+import { artworkSrc, cardArtworks, defaultArtworkId, getArtwork, inferArtworkId } from "./cardArt";
 import { matchesFilters, rollDinner } from "./dice";
 import {
   createBackup,
@@ -91,6 +92,7 @@ const themes: ThemeConfig[] = [
 const emptyDraft: Draft = {
   name: "",
   category: "",
+  artworkId: defaultArtworkId,
   mode: "dine-in",
   place: "both",
   budget: 35,
@@ -103,11 +105,11 @@ const emptyDraft: Draft = {
 };
 
 const demoRestaurants: Restaurant[] = [
-  makeRestaurant({ name: "公司楼下盖饭", category: "快饭", place: "work", budget: 28, distanceMinutes: 8, health: 2, spice: 1, weight: 4 }),
-  makeRestaurant({ name: "家附近轻食碗", category: "轻食", mode: "delivery", place: "home", budget: 42, distanceMinutes: 25, health: 5, spice: 0, weight: 3 }),
-  makeRestaurant({ name: "川味小炒", category: "川菜", place: "both", budget: 55, distanceMinutes: 18, health: 2, spice: 3, weight: 5 }),
-  makeRestaurant({ name: "公司牛肉粉", category: "粉面", place: "work", budget: 32, distanceMinutes: 12, health: 3, spice: 2, weight: 4 }),
-  makeRestaurant({ name: "家附近日式便当", category: "便当", mode: "delivery", place: "home", budget: 48, distanceMinutes: 30, health: 4, spice: 0, weight: 3 }),
+  makeRestaurant({ name: "公司楼下盖饭", category: "快饭", artworkId: "curry-rice", place: "work", budget: 28, distanceMinutes: 8, health: 2, spice: 1, weight: 4 }),
+  makeRestaurant({ name: "家附近轻食碗", category: "轻食", artworkId: "salad", mode: "delivery", place: "home", budget: 42, distanceMinutes: 25, health: 5, spice: 0, weight: 3 }),
+  makeRestaurant({ name: "川味小炒", category: "川菜", artworkId: "mala", place: "both", budget: 55, distanceMinutes: 18, health: 2, spice: 3, weight: 5 }),
+  makeRestaurant({ name: "公司牛肉粉", category: "粉面", artworkId: "beef-noodles", place: "work", budget: 32, distanceMinutes: 12, health: 3, spice: 2, weight: 4 }),
+  makeRestaurant({ name: "家附近日式便当", category: "便当", artworkId: "bento", mode: "delivery", place: "home", budget: 48, distanceMinutes: 30, health: 4, spice: 0, weight: 3 }),
 ];
 
 const defaultFilters: Filters = {
@@ -203,6 +205,7 @@ export default function App() {
     setDraft({
       name: item.name,
       category: item.category,
+      artworkId: item.artworkId || inferArtworkId(item),
       mode: item.mode,
       place: item.place || "both",
       budget: item.budget,
@@ -226,6 +229,12 @@ export default function App() {
   function fillDemo() {
     setRestaurants((items) => [...demoRestaurants, ...items]);
     setNotice("已填入 5 张示例卡");
+  }
+
+  function clearHistory() {
+    setHistory([]);
+    setRestaurants((items) => items.map((item) => ({ ...item, lastEatenAt: undefined })));
+    setNotice("最近记录已清空");
   }
 
   function relaxFilters() {
@@ -379,6 +388,7 @@ export default function App() {
                 <span>类型</span>
                 <input value={draft.category} onChange={(event) => setDraft({ ...draft, category: event.target.value })} placeholder="粉面、轻食、川菜" />
               </label>
+              <ArtworkPicker value={draft.artworkId} onChange={(value) => setDraft({ ...draft, artworkId: value })} />
               <div className="grid-two">
                 <NumberField label="预算" value={draft.budget} min={1} onChange={(value) => setDraft({ ...draft, budget: value })} />
                 <NumberField label="距离分钟" value={draft.distanceMinutes} min={1} onChange={(value) => setDraft({ ...draft, distanceMinutes: value })} />
@@ -425,7 +435,9 @@ export default function App() {
               ) : (
                 restaurants.map((item) => (
                   <article className={item.enabled ? "food-card" : "food-card disabled"} key={item.id}>
-                    <div className="food-thumb">{dishEmoji(item)}</div>
+                    <div className="food-thumb">
+                      <img src={artworkSrc(item.artworkId)} alt={getArtwork(item.artworkId).label} />
+                    </div>
                     <div>
                       <p>{rarityFor(item)} · {placeLabel(item.place)} · {item.category || modeLabel(item.mode)}</p>
                       <h3>{item.name}</h3>
@@ -546,6 +558,10 @@ export default function App() {
               </div>
               <div className="toolbar">
                 <button type="button" onClick={fillDemo}>填入示例</button>
+                <button type="button" onClick={clearHistory}>
+                  <Trash2 size={16} />
+                  清空最近记录
+                </button>
               </div>
             </div>
           </section>
@@ -587,7 +603,11 @@ function FoodPrizeCard({ restaurant, theme, restaurantsCount }: { restaurant: Re
         </span>
       </div>
       <div className="dish-visual">
-        <span>{restaurant ? dishEmoji(restaurant) : "🍱"}</span>
+        {restaurant ? (
+          <img src={artworkSrc(restaurant.artworkId)} alt={getArtwork(restaurant.artworkId).label} />
+        ) : (
+          <span>🍱</span>
+        )}
       </div>
       <div className="card-copy">
         <h2>{name}</h2>
@@ -641,6 +661,22 @@ function NumberField({ label, value, min, onChange }: { label: string; value: nu
       <span>{label}</span>
       <input type="number" min={min} value={value} onChange={(event) => onChange(Number(event.target.value))} />
     </label>
+  );
+}
+
+function ArtworkPicker({ value, onChange }: { value: string; onChange: (value: string) => void }) {
+  return (
+    <div className="artwork-picker">
+      <span>卡牌图案</span>
+      <div className="artwork-grid">
+        {cardArtworks.map((item) => (
+          <button className={value === item.id ? "selected" : ""} key={item.id} type="button" onClick={() => onChange(item.id)} title={item.label}>
+            <img src={artworkSrc(item.id)} alt={item.label} />
+            <strong>{item.label}</strong>
+          </button>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -721,17 +757,6 @@ function rarityFor(item: Restaurant) {
 function rarityForName(name: string) {
   if (name.length >= 5) return "SR";
   return "R";
-}
-
-function dishEmoji(item: Restaurant) {
-  const text = `${item.name}${item.category}`;
-  if (/粉|面|拉面|意面/.test(text)) return "🍜";
-  if (/饭|盖饭|便当|米/.test(text)) return "🍛";
-  if (/轻食|沙拉|健康/.test(text)) return "🥗";
-  if (/寿司|日式/.test(text)) return "🍣";
-  if (/火锅|锅/.test(text)) return "🍲";
-  if (/鸡|鸭|肉|牛/.test(text)) return "🍗";
-  return "🍱";
 }
 
 function formatDate(value: string) {

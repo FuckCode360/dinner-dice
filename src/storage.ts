@@ -1,4 +1,5 @@
 import type { BackupPayload, DinnerHistory, Restaurant } from "./types";
+import { inferArtworkId } from "./cardArt";
 
 const RESTAURANTS_KEY = "dinner-dice:v1:restaurants";
 const HISTORY_KEY = "dinner-dice:v1:history";
@@ -54,6 +55,7 @@ function normalizeRestaurant(item: Partial<Restaurant>): Restaurant {
     id: item.id || crypto.randomUUID(),
     name: item.name || "",
     category: item.category || "",
+    artworkId: inferArtworkId(item),
     mode: item.mode === "delivery" ? "delivery" : "dine-in",
     place: item.place === "work" || item.place === "home" || item.place === "both" ? item.place : "both",
     budget: Number(item.budget) || 35,
