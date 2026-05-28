@@ -16,6 +16,7 @@
 - 已补充抽卡召唤动画：点击抽取后出现召唤中状态、光圈、粒子、卡牌翻闪，并延迟揭晓结果。
 - 已新增 GitHub Pages Actions 部署配置，并已推送到 `FuckCode360/dinner-dice` 自动构建发布。
 - 已按使用反馈调整入口：抽卡皮肤只在设置页切换且只作用于抽卡页，备份导入导出移入设置页，示例数据移入设置页调试模式，底部入口改为“抽卡”。
+- 已补充 PWA 安装资源：manifest、favicon、apple-touch-icon、Android any/maskable PNG 图标和最小 service worker。
 
 ## 进行中
 
